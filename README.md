@@ -30,7 +30,7 @@ Usa **Claude** (Anthropic) para razonar y responder, y **embeddings locales** mu
 
 ```powershell
 # 1. Clonar el repositorio
-git clone https://github.com/TU_USUARIO/RAG-Personal.git
+git clone https://github.com/JGOM04/RAG-Personal.git
 cd RAG-Personal
 
 # 2. Crear y activar el entorno virtual
