@@ -69,7 +69,7 @@ python rag_personal.py
 | Acción | Cómo |
 |--------|------|
 | Preguntar escribiendo | Escribe la pregunta y pulsa Enter |
-| Preguntar hablando | Pulsa Enter sin escribir nada, habla y vuelve a pulsar Enter |
+| Preguntar hablando | Pulsa Enter sin escribir nada y habla: la grabación para sola cuando dejas de hablar (o pulsa Enter) |
 | Interrumpir la respuesta hablada | Pulsa Enter o empieza a escribir |
 | Activar/desactivar las respuestas habladas | Escribe `voz` |
 | Terminar | Escribe o di `salir` |
@@ -80,7 +80,8 @@ RAG personal listo.
   · 'voz' activa o desactiva las respuestas habladas. 'salir' termina.
 
 Tú:
-  🎙️  Te escucho... pulsa Enter cuando termines.
+  🎙️  Te escucho... (paro solo cuando dejes de hablar, o pulsa Enter)
+  (Grabados 3.4 s, volumen máximo 0.21)
 Tú (voz): ¿Qué temas trata el informe de marzo?
 
 Claude: ...   (y la lee en voz alta)

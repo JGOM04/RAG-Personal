@@ -5,7 +5,13 @@
 """
 
 import io
+import queue
 import re
+
+try:
+    import msvcrt  # Windows: detectar Enter sin bloquear
+except ImportError:
+    msvcrt = None
 
 import numpy as np
 import sounddevice as sd
@@ -37,30 +43,80 @@ def _a_16khz(audio: np.ndarray, frecuencia: int) -> np.ndarray:
     return np.interp(x, np.arange(len(audio)), audio).astype(np.float32)
 
 
-def grabar() -> np.ndarray:
-    """Graba del micrófono hasta que el usuario pulse Enter. Devuelve audio a 16 kHz."""
+def _enter_pulsado() -> bool:
+    """True si se ha pulsado Enter (sin bloquear y sin dejar la tecla en el búfer)."""
+    if msvcrt is None:
+        return False
+    pulsado = False
+    while msvcrt.kbhit():
+        if msvcrt.getwch() in "\r\n":
+            pulsado = True
+    return pulsado
+
+
+def grabar(max_segundos: float = 30, silencio_final: float = 1.5,
+           espera_sin_voz: float = 8) -> tuple[np.ndarray, bool]:
+    """Graba del micrófono y para sola cuando dejas de hablar (o al pulsar Enter).
+    Devuelve (audio a 16 kHz, si se detectó voz)."""
     frecuencia = int(sd.query_devices(kind="input")["default_samplerate"])
-    bloques = []
+    bloque = int(frecuencia * 0.1)  # trozos de 100 ms
+    cola: queue.Queue = queue.Queue()
 
     def guardar(indata, frames, tiempo, estado):
-        bloques.append(indata[:, 0].copy())
+        cola.put(indata[:, 0].copy())
 
-    with sd.InputStream(samplerate=frecuencia, channels=1, dtype="float32", callback=guardar):
-        input("  🎙️  Te escucho... pulsa Enter cuando termines.")
-    audio = np.concatenate(bloques) if bloques else np.zeros(0, dtype=np.float32)
-    return _a_16khz(audio, frecuencia)
+    _enter_pulsado()  # descarta pulsaciones previas
+    print("  🎙️  Te escucho... (paro solo cuando dejes de hablar, o pulsa Enter)")
+    trozos, niveles = [], []
+    segundos, ultimo_con_voz, hubo_voz = 0.0, 0.0, False
+
+    with sd.InputStream(samplerate=frecuencia, channels=1, dtype="float32",
+                        blocksize=bloque, callback=guardar):
+        while segundos < max_segundos:
+            try:
+                trozo = cola.get(timeout=2)
+            except queue.Empty:
+                raise RuntimeError("el micrófono no está enviando audio")
+            trozos.append(trozo)
+            segundos += len(trozo) / frecuencia
+            nivel = float(np.sqrt(np.mean(trozo ** 2)))
+            niveles.append(nivel)
+
+            # El ruido de fondo se estima con el primer medio segundo
+            ruido = float(np.median(niveles[:5]))
+            if segundos > 0.5 and nivel > max(ruido * 2.5, 0.004):
+                hubo_voz, ultimo_con_voz = True, segundos
+            if hubo_voz and segundos - ultimo_con_voz > silencio_final:
+                break
+            if not hubo_voz and segundos > espera_sin_voz:
+                break
+            if _enter_pulsado():
+                break
+
+    audio = np.concatenate(trozos) if trozos else np.zeros(0, dtype=np.float32)
+    pico = float(np.abs(audio).max()) if len(audio) else 0.0
+    aviso = "" if hubo_voz else " — no detecté voz, ¿micrófono silenciado o muy bajo?"
+    print(f"  (Grabados {segundos:.1f} s, volumen máximo {pico:.2f}{aviso})")
+    return _a_16khz(audio, frecuencia), hubo_voz
 
 
 def transcribir(audio: np.ndarray) -> str:
     if len(audio) < FRECUENCIA_WHISPER * 0.3:  # menos de 0,3 s: no hay nada que entender
         return ""
-    segmentos, _ = _modelo_whisper().transcribe(audio, language="es", vad_filter=True)
-    return " ".join(s.text.strip() for s in segmentos).strip()
+    pico = float(np.abs(audio).max())
+    if pico > 0:
+        audio = (audio / pico * 0.9).astype(np.float32)  # sube el volumen de micrófonos flojos
+    segmentos, _ = _modelo_whisper().transcribe(
+        audio, language="es", vad_filter=True, condition_on_previous_text=False
+    )
+    # Whisper "inventa" frases con el silencio: descarta lo que marca como no-voz
+    return " ".join(s.text.strip() for s in segmentos if s.no_speech_prob < 0.6).strip()
 
 
 def escuchar() -> str:
     """Graba una pregunta hablada y la devuelve como texto."""
-    return transcribir(grabar())
+    audio, hubo_voz = grabar()
+    return transcribir(audio) if hubo_voz else ""
 
 
 def _limpiar_para_voz(texto: str) -> str:
