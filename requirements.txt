@@ -1,0 +1,12 @@
+llama-index-core
+llama-index-llms-anthropic
+llama-index-embeddings-huggingface
+llama-index-readers-file
+python-dotenv
+pandas
+pypdf
+docx2txt
+python-pptx
+openpyxl
+EbookLib
+html2text
