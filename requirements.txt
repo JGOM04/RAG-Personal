@@ -10,3 +10,4 @@ python-pptx
 openpyxl
 EbookLib
 html2text
+graphifyy
