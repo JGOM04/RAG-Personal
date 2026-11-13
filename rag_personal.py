@@ -9,6 +9,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()  # carga ANTHROPIC_API_KEY desde .env
+os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")  # aviso inofensivo en Windows
 
 from llama_index.core import (
     Settings,
@@ -227,16 +228,47 @@ agent = FunctionAgent(
 )
 
 
-# 5) Chat en terminal con memoria de la conversación
+# 5) Chat por texto o por voz, con memoria de la conversación
 async def main():
+    import voz
+
     ctx = Context(agent)
-    print("RAG personal listo. Escribe 'salir' para terminar.\n")
+    voz_activa = True  # leer las respuestas en voz alta
+    print(
+        "RAG personal listo.\n"
+        "  · Escribe tu pregunta, o pulsa Enter sin escribir nada para hablar.\n"
+        "  · 'voz' activa o desactiva las respuestas habladas. 'salir' termina.\n"
+    )
     while True:
         pregunta = input("Tú: ").strip()
-        if pregunta.lower() in {"salir", "exit", "quit"}:
+        voz.callar()  # escribir o pulsar Enter interrumpe la respuesta hablada
+
+        if not pregunta:  # Enter vacío: pregunta por voz
+            try:
+                pregunta = await asyncio.to_thread(voz.escuchar)
+            except Exception as e:
+                print(f"  ! No se pudo usar el micrófono: {e}\n")
+                continue
+            if not pregunta:
+                print("  (No te he entendido, prueba otra vez.)\n")
+                continue
+            print(f"Tú (voz): {pregunta}")
+
+        orden = pregunta.lower().strip(" .,;:!¡?¿")
+        if orden in {"salir", "exit", "quit"}:
             break
-        respuesta = await agent.run(user_msg=pregunta, ctx=ctx)
+        if orden == "voz":
+            voz_activa = not voz_activa
+            print(f"  Respuestas habladas {'activadas' if voz_activa else 'desactivadas'}.\n")
+            continue
+
+        respuesta = str(await agent.run(user_msg=pregunta, ctx=ctx))
         print(f"\nClaude: {respuesta}\n")
+        if voz_activa:
+            try:
+                await voz.hablar(respuesta)
+            except Exception as e:
+                print(f"  ! No se pudo leer la respuesta en voz alta: {e}\n")
 
 
 if __name__ == "__main__":

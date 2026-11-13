@@ -7,6 +7,7 @@ Usa **Claude** (Anthropic) para razonar y responder, **embeddings locales** mult
 ## Características
 
 - 💬 Chat en la terminal que recuerda la conversación.
+- 🎙️ **Por voz**: puedes preguntar hablando (Whisper en local) y escuchar la respuesta (voces neuronales de edge-tts), o seguir escribiendo.
 - 🔍 Un agente que decide cuándo buscar en tus documentos.
 - 🕸️ **GraphRAG**: además de la búsqueda vectorial, el agente consulta un grafo de conocimiento para responder preguntas sobre relaciones ("¿qué relación hay entre X e Y?").
 - ⚡ Indexación incremental: solo reindexa cuando añades, modificas o eliminas archivos en `data/`.
@@ -26,6 +27,7 @@ Usa **Claude** (Anthropic) para razonar y responder, **embeddings locales** mult
 
 - Python 3.10 o superior
 - Una API key de Anthropic: [console.anthropic.com](https://console.anthropic.com/)
+- Para el modo voz: micrófono, altavoces y conexión a internet (para sintetizar la voz)
 
 ## Instalación
 
@@ -62,15 +64,29 @@ ANTHROPIC_API_KEY=tu_api_key_aqui
 python rag_personal.py
 ```
 
-3. Haz preguntas sobre tus documentos. Escribe `salir` para terminar.
+3. Haz preguntas sobre tus documentos, escribiendo o hablando:
+
+| Acción | Cómo |
+|--------|------|
+| Preguntar escribiendo | Escribe la pregunta y pulsa Enter |
+| Preguntar hablando | Pulsa Enter sin escribir nada, habla y vuelve a pulsar Enter |
+| Interrumpir la respuesta hablada | Pulsa Enter o empieza a escribir |
+| Activar/desactivar las respuestas habladas | Escribe `voz` |
+| Terminar | Escribe o di `salir` |
 
 ```
-RAG personal listo. Escribe 'salir' para terminar.
+RAG personal listo.
+  · Escribe tu pregunta, o pulsa Enter sin escribir nada para hablar.
+  · 'voz' activa o desactiva las respuestas habladas. 'salir' termina.
 
-Tú: ¿Qué temas trata el informe de marzo?
+Tú:
+  🎙️  Te escucho... pulsa Enter cuando termines.
+Tú (voz): ¿Qué temas trata el informe de marzo?
 
-Claude: ...
+Claude: ...   (y la lee en voz alta)
 ```
+
+La voz y el modelo de Whisper se configuran al principio de `voz.py` (`VOZ` y `MODELO_WHISPER`).
 
 La primera ejecución descarga el modelo de embeddings (unos 2 GB), indexa todos los documentos y construye el grafo de conocimiento, así que tarda un poco. Las siguientes cargan el índice guardado en `storage/` y el grafo de `grafo/`.
 
@@ -82,7 +98,8 @@ Para ver el grafo de forma interactiva, abre `grafo/graphify-out/graph.html` en 
 
 ```
 RAG-Personal/
-├── rag_personal.py     # Script principal
+├── rag_personal.py     # Script principal (indexación, grafo, agente y chat)
+├── voz.py              # Entrada (Whisper) y salida (edge-tts) de voz
 ├── requirements.txt    # Dependencias
 ├── .env                # API key (no se sube)
 ├── data/               # Tus documentos (no se sube)
@@ -100,11 +117,14 @@ RAG-Personal/
    - `consultar_grafo`: recorre el grafo a partir de unas palabras clave para dar una visión de conjunto.
    - `relacion_entre`: encuentra el camino más corto entre dos conceptos del grafo.
 5. **Respuesta:** Claude combina lo que encuentra, responde en español y avisa si no encuentra la información.
+6. **Voz (opcional):** la pregunta hablada se transcribe en local con `faster-whisper` y la respuesta se limpia de Markdown y se lee con `edge-tts`.
 
 ```
-            ┌─ buscar_en_mis_documentos ─► índice vectorial (storage/)
-Pregunta ─► Agente (Claude)
-            └─ consultar_grafo / relacion_entre ─► grafo de conocimiento (grafo/)
+Voz ─► Whisper ─┐               ┌─ buscar_en_mis_documentos ─► índice vectorial (storage/)
+                ├─► Agente (Claude)
+Texto ──────────┘               └─ consultar_grafo / relacion_entre ─► grafo (grafo/)
+                        │
+                        └─► respuesta en texto + voz (edge-tts)
 ```
 
 ## Tecnologías
@@ -113,3 +133,5 @@ Pregunta ─► Agente (Claude)
 - [Anthropic Claude](https://www.anthropic.com/)
 - [Hugging Face: BAAI/bge-m3](https://huggingface.co/BAAI/bge-m3)
 - [graphify](https://github.com/Graphify-Labs/graphify)
+- [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
+- [edge-tts](https://github.com/rany2/edge-tts)

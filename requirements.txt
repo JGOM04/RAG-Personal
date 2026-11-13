@@ -11,3 +11,7 @@ openpyxl
 EbookLib
 html2text
 graphifyy
+faster-whisper
+sounddevice
+soundfile
+edge-tts
