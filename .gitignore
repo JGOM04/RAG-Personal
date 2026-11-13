@@ -2,3 +2,4 @@
 .venv/
 storage/
 grafo/
+__pycache__/
